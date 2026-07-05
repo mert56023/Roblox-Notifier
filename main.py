@@ -6,14 +6,15 @@ KULLANICI_ID    = 1623981172
 KULLANICI_ADI   = "BabiOyundaya"
 KONTROL_ARALIGI = 60
 TELEGRAM_TOKEN  = "8930204525:AAFgt3Yp9DGp0CyiodnCWc2d8cxVEMksf3c"
-TELEGRAM_CHAT   = "6074216089"
+TELEGRAM_CHATLER = ["6074216089", "8796557376"]  # Sen + arkadaşın
 
 def telegram_gonder(mesaj):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    try:
-        requests.post(url, json={"chat_id": TELEGRAM_CHAT, "text": mesaj}, timeout=8)
-    except Exception as e:
-        print(f"  [!] Telegram hatasi: {e}")
+    for chat_id in TELEGRAM_CHATLER:
+        try:
+            requests.post(url, json={"chat_id": chat_id, "text": mesaj}, timeout=8)
+        except Exception as e:
+            print(f"  [!] Telegram hatasi ({chat_id}): {e}")
 
 def kullanici_durumu_al():
     url = "https://presence.roblox.com/v1/presence/users"
@@ -44,6 +45,7 @@ def main():
     print("=" * 50)
     print(f"   Kullanici ID   : {KULLANICI_ID}")
     print(f"   Kontrol suresi : her {KONTROL_ARALIGI} saniye")
+    print(f"   Bildirim gidecekler : {len(TELEGRAM_CHATLER)} kisi")
     print("=" * 50)
 
     telegram_gonder(
@@ -68,7 +70,6 @@ def main():
         hata_sayisi = 0
 
         if onceki_durum is None:
-            # İlk kontrol
             if durum == "oyunda":
                 mesaj = f"🎮 {KULLANICI_ADI} su an OYUNDA!"
             elif durum == "online":
@@ -79,44 +80,24 @@ def main():
             telegram_gonder(mesaj)
 
         elif durum == "oyunda" and onceki_durum == "offline":
-            # Çevrimdışı → Oyunda (direkt oyuna girdi)
             print(f"[{zaman()}] Cevrimdisi -> Oyunda!")
-            telegram_gonder(
-                f"🎮 {KULLANICI_ADI} ROBLOX'A GİRDİ ve OYUNA BASLADI!\n"
-                f"⏰ Saat: {zaman()}"
-            )
+            telegram_gonder(f"🎮 {KULLANICI_ADI} ROBLOX'A GİRDİ ve OYUNA BASLADI!\n⏰ Saat: {zaman()}")
 
         elif durum == "oyunda" and onceki_durum == "online":
-            # Aktif → Oyunda
             print(f"[{zaman()}] Aktif -> Oyunda!")
-            telegram_gonder(
-                f"🎮 {KULLANICI_ADI} OYUNA GIRDI!\n"
-                f"⏰ Saat: {zaman()}"
-            )
+            telegram_gonder(f"🎮 {KULLANICI_ADI} OYUNA GIRDI!\n⏰ Saat: {zaman()}")
 
         elif durum == "online" and onceki_durum == "offline":
-            # Çevrimdışı → Aktif (Roblox'a girdi ama oyun seçmedi)
             print(f"[{zaman()}] Cevrimdisi -> Aktif!")
-            telegram_gonder(
-                f"🟡 {KULLANICI_ADI} ROBLOX'A GİRDİ! (Henuz oyun secmedi)\n"
-                f"⏰ Saat: {zaman()}"
-            )
+            telegram_gonder(f"🟡 {KULLANICI_ADI} ROBLOX'A GİRDİ! (Henuz oyun secmedi)\n⏰ Saat: {zaman()}")
 
         elif durum == "online" and onceki_durum == "oyunda":
-            # Oyunda → Aktif (oyundan çıktı ama Roblox'ta)
             print(f"[{zaman()}] Oyundan cikti, hala aktif.")
-            telegram_gonder(
-                f"🟡 {KULLANICI_ADI} OYUNDAN CIKTI ama hala Roblox'ta aktif.\n"
-                f"⏰ Saat: {zaman()}"
-            )
+            telegram_gonder(f"🟡 {KULLANICI_ADI} OYUNDAN CIKTI ama hala Roblox'ta aktif.\n⏰ Saat: {zaman()}")
 
         elif durum == "offline" and onceki_durum != "offline":
-            # Her türlü → Çevrimdışı
             print(f"[{zaman()}] Cevrimdisi oldu.")
-            telegram_gonder(
-                f"🔴 {KULLANICI_ADI} CEVRIMDISI OLDU.\n"
-                f"⏰ Saat: {zaman()}"
-            )
+            telegram_gonder(f"🔴 {KULLANICI_ADI} CEVRIMDISI OLDU.\n⏰ Saat: {zaman()}")
 
         onceki_durum = durum
         time.sleep(KONTROL_ARALIGI)
