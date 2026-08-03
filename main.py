@@ -1,12 +1,14 @@
 import requests
-import time
-from datetime import datetime
+import json
+import os
+from pathlib import Path
 
-KULLANICI_ID    = 1623981172
-KULLANICI_ADI   = "BabiOyundaya"
-KONTROL_ARALIGI = 60
-TELEGRAM_TOKEN  = "8930204525:AAFgt3Yp9DGp0CyiodnCWc2d8cxVEMksf3c"
+KULLANICI_ID     = 1623981172
+KULLANICI_ADI    = "BabiOyundaya"
+TELEGRAM_TOKEN   = os.environ.get("TELEGRAM_TOKEN", "8930204525:AAFgt3Yp9DGp0CyiodnCWc2d8cxVEMksf3c")
 TELEGRAM_CHATLER = ["6074216089", "8796557376"]  # Sen + arkadaşın
+DURUM_DOSYASI    = Path("durum.json")
+
 
 def telegram_gonder(mesaj):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
@@ -15,6 +17,7 @@ def telegram_gonder(mesaj):
             requests.post(url, json={"chat_id": chat_id, "text": mesaj}, timeout=8)
         except Exception as e:
             print(f"  [!] Telegram hatasi ({chat_id}): {e}")
+
 
 def kullanici_durumu_al():
     url = "https://presence.roblox.com/v1/presence/users"
@@ -30,77 +33,58 @@ def kullanici_durumu_al():
                 return "online"
             else:
                 return "offline"
-    except requests.exceptions.HTTPError as e:
-        print(f"[{zaman()}] [!] HTTP hatasi: {e}")
-    except requests.exceptions.RequestException as e:
-        print(f"[{zaman()}] [!] Baglanti hatasi: {e}")
+    except Exception as e:
+        print(f"[!] API hatasi: {e}")
     return None
 
-def zaman():
-    return datetime.now().strftime("%H:%M:%S")
+
+def onceki_durumu_oku():
+    if DURUM_DOSYASI.exists():
+        try:
+            return json.loads(DURUM_DOSYASI.read_text()).get("durum")
+        except Exception:
+            return None
+    return None
+
+
+def durumu_kaydet(durum):
+    DURUM_DOSYASI.write_text(json.dumps({"durum": durum}))
+
 
 def main():
-    print("=" * 50)
-    print(f"   Roblox Notifier - {KULLANICI_ADI} takip ediliyor")
-    print("=" * 50)
-    print(f"   Kullanici ID   : {KULLANICI_ID}")
-    print(f"   Kontrol suresi : her {KONTROL_ARALIGI} saniye")
-    print(f"   Bildirim gidecekler : {len(TELEGRAM_CHATLER)} kisi")
-    print("=" * 50)
+    yeni_durum = kullanici_durumu_al()
+    if yeni_durum is None:
+        print("Durum alinamadi, bu calismada bildirim gonderilmeyecek.")
+        return
 
-    telegram_gonder(
-        f"✅ Roblox Notifier baslatildi!\n"
-        f"👤 Takip edilen: {KULLANICI_ADI}\n"
-        f"🔄 Her {KONTROL_ARALIGI} saniyede bir kontrol edilecek."
-    )
+    onceki_durum = onceki_durumu_oku()
+    print(f"Onceki: {onceki_durum} -> Yeni: {yeni_durum}")
 
-    onceki_durum = None
-    hata_sayisi = 0
+    if onceki_durum is None:
+        # Sistem ilk kez calisiyor
+        if yeni_durum == "oyunda":
+            telegram_gonder(f"🎮 {KULLANICI_ADI} su an OYUNDA!")
+        elif yeni_durum == "online":
+            telegram_gonder(f"🟡 {KULLANICI_ADI} su an AKTIF (oyunda degil).")
+        else:
+            telegram_gonder(f"🔴 {KULLANICI_ADI} su an CEVRIMDISI.")
 
-    while True:
-        durum = kullanici_durumu_al()
+    elif yeni_durum != onceki_durum:
+        if yeni_durum == "oyunda" and onceki_durum == "offline":
+            telegram_gonder(f"🎮 {KULLANICI_ADI} ROBLOX'A GİRDİ ve OYUNA BASLADI!")
+        elif yeni_durum == "oyunda" and onceki_durum == "online":
+            telegram_gonder(f"🎮 {KULLANICI_ADI} OYUNA GIRDI!")
+        elif yeni_durum == "online" and onceki_durum == "offline":
+            telegram_gonder(f"🟡 {KULLANICI_ADI} ROBLOX'A GİRDİ! (Henuz oyun secmedi)")
+        elif yeni_durum == "online" and onceki_durum == "oyunda":
+            telegram_gonder(f"🟡 {KULLANICI_ADI} OYUNDAN CIKTI ama hala Roblox'ta aktif.")
+        elif yeni_durum == "offline" and onceki_durum != "offline":
+            telegram_gonder(f"🔴 {KULLANICI_ADI} CEVRIMDISI OLDU.")
+    else:
+        print("Durum degismedi, bildirim yok.")
 
-        if durum is None:
-            hata_sayisi += 1
-            bekleme = 120 if hata_sayisi >= 5 else KONTROL_ARALIGI
-            print(f"[{zaman()}] Hata ({hata_sayisi}), {bekleme}sn bekleniyor...")
-            time.sleep(bekleme)
-            continue
+    durumu_kaydet(yeni_durum)
 
-        hata_sayisi = 0
-
-        if onceki_durum is None:
-            if durum == "oyunda":
-                mesaj = f"🎮 {KULLANICI_ADI} su an OYUNDA!"
-            elif durum == "online":
-                mesaj = f"🟡 {KULLANICI_ADI} su an AKTIF (oyunda degil)."
-            else:
-                mesaj = f"🔴 {KULLANICI_ADI} su an CEVRIMDISI."
-            print(f"[{zaman()}] Baslangic: {durum}")
-            telegram_gonder(mesaj)
-
-        elif durum == "oyunda" and onceki_durum == "offline":
-            print(f"[{zaman()}] Cevrimdisi -> Oyunda!")
-            telegram_gonder(f"🎮 {KULLANICI_ADI} ROBLOX'A GİRDİ ve OYUNA BASLADI!\n⏰ Saat: {zaman()}")
-
-        elif durum == "oyunda" and onceki_durum == "online":
-            print(f"[{zaman()}] Aktif -> Oyunda!")
-            telegram_gonder(f"🎮 {KULLANICI_ADI} OYUNA GIRDI!\n⏰ Saat: {zaman()}")
-
-        elif durum == "online" and onceki_durum == "offline":
-            print(f"[{zaman()}] Cevrimdisi -> Aktif!")
-            telegram_gonder(f"🟡 {KULLANICI_ADI} ROBLOX'A GİRDİ! (Henuz oyun secmedi)\n⏰ Saat: {zaman()}")
-
-        elif durum == "online" and onceki_durum == "oyunda":
-            print(f"[{zaman()}] Oyundan cikti, hala aktif.")
-            telegram_gonder(f"🟡 {KULLANICI_ADI} OYUNDAN CIKTI ama hala Roblox'ta aktif.\n⏰ Saat: {zaman()}")
-
-        elif durum == "offline" and onceki_durum != "offline":
-            print(f"[{zaman()}] Cevrimdisi oldu.")
-            telegram_gonder(f"🔴 {KULLANICI_ADI} CEVRIMDISI OLDU.\n⏰ Saat: {zaman()}")
-
-        onceki_durum = durum
-        time.sleep(KONTROL_ARALIGI)
 
 if __name__ == "__main__":
     main()
