@@ -6,7 +6,7 @@ from pathlib import Path
 KULLANICI_ID     = 1623981172
 KULLANICI_ADI    = "BabiOyundaya"
 TELEGRAM_TOKEN   = os.environ.get("TELEGRAM_TOKEN", "8930204525:AAFgt3Yp9DGp0CyiodnCWc2d8cxVEMksf3c")
-TELEGRAM_CHATLER = ["6074216089", "8796557376"]  # Sen + arkadaşın
+TELEGRAM_CHATLER = ["6074216089", "8796557376", "8921846267"]  # Sen + arkadaşların
 DURUM_DOSYASI    = Path("durum.json")
 
 
